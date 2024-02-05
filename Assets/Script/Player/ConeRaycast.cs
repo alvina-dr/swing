@@ -14,6 +14,8 @@ public class ConeRaycast : MonoBehaviour
         Z = 2
     }
 
+    public LayerMask layerMask;
+
     [Header("RAYCAST METHOD")]
     public float minRadius;
     public float maxRadius;
@@ -41,7 +43,7 @@ public class ConeRaycast : MonoBehaviour
             }
             Debug.DrawRay(transform.position, _direction, Color.red);
             RaycastHit hit;
-            if (Physics.Raycast(GPCtrl.Instance.player.playerMesh.transform.position, _direction, out hit, height))
+            if (Physics.Raycast(GPCtrl.Instance.player.playerMesh.transform.position, _direction, out hit, height, layerMask))
             {
                 contactPointList.Add(hit.point);
             }

@@ -19,14 +19,15 @@ public class PlayerGrappling : MonoBehaviour
     [SerializeField] private LineRenderer swingLineRenderer;
 
     [Header("GRAPPLING")]
-    [SerializeField] private ConeRaycast accelerationConeRaycast;
-    private Vector3 grapplePoint;
+    [SerializeField] private ConeCollider grapplingConeCollider;
     public bool isGrappling = false;
     public bool grappleFreeze = false;
     [SerializeField] private float grappleFreezeDelay;
     [SerializeField] private float overshootYAxis;
+    [SerializeField] private float grapplingAcceleration;
     [SerializeField] private LineRenderer leftGrapplingLineRenderer;
     [SerializeField] private LineRenderer rightGrapplingLineRenderer;
+    private GrapplingPoint grapplePoint;
 
 
     private void LateUpdate()
@@ -41,21 +42,32 @@ public class PlayerGrappling : MonoBehaviour
         }
         if (isGrappling)
         {
-            leftGrapplingLineRenderer.SetPosition(0, player.leftHand.transform.position);
-            if (leftGrapplingLineRenderer.GetPosition(1) != grapplePoint)
+            if (leftGrapplingLineRenderer.positionCount > 0)
             {
-                leftGrapplingLineRenderer.SetPosition(1, Vector3.Lerp(leftGrapplingLineRenderer.GetPosition(1), grapplePoint, 0.1f));
+                leftGrapplingLineRenderer.SetPosition(0, player.leftHand.transform.position);
+                if (leftGrapplingLineRenderer.GetPosition(1) != grapplePoint.transform.position)
+                {
+                    leftGrapplingLineRenderer.SetPosition(1, Vector3.Lerp(leftGrapplingLineRenderer.GetPosition(1), grapplePoint.transform.position, 0.1f));
+                }
             }
-            rightGrapplingLineRenderer.SetPosition(0, player.rightHand.transform.position);
-            if (rightGrapplingLineRenderer.GetPosition(1) != grapplePoint)
+            if (rightGrapplingLineRenderer.positionCount > 0)
             {
-                rightGrapplingLineRenderer.SetPosition(1, Vector3.Lerp(rightGrapplingLineRenderer.GetPosition(1), grapplePoint, 0.1f));
+                rightGrapplingLineRenderer.SetPosition(0, player.rightHand.transform.position);
+                if (rightGrapplingLineRenderer.GetPosition(1) != grapplePoint.transform.position)
+                {
+                    rightGrapplingLineRenderer.SetPosition(1, Vector3.Lerp(rightGrapplingLineRenderer.GetPosition(1), grapplePoint.transform.position, 0.1f));
+                }
             }
         }
     }
 
     private void Update()
     {
+        //if (isSwinging)
+        //{
+        //    player.playerMesh.transform.up = swingPoint - player.playerMesh.transform.position;
+        //}
+
         if (trySwing) StartSwing();
         else StopSwing();
 
@@ -63,42 +75,28 @@ public class PlayerGrappling : MonoBehaviour
         {
             player.rigibody.velocity = Vector3.zero;
         }
-        if (isGrappling && Vector3.Distance(transform.position, grapplePoint) < 3)
+
+        if (isGrappling && Vector3.Distance(transform.position, grapplePoint.transform.position) < 2)
         {
             StopGrapple();
         }
-        //if (isGrappling && !player.rightShoulder && !player.leftShoulder)
-        //{
-        //    StopGrapple();
-        //}
-        
-        if (accelerationConeRaycast.contactPointList.Count > 0 && !isGrappling)
+        if (!isGrappling) GPCtrl.Instance.grapplePointIndicator.Hide();
+        if (grapplingConeCollider.pointList.Count > 0 && !isGrappling)
         {
-            float _distance = 1000;
-            Vector3 _point = Vector3.zero;
-            for (int i = 0; i < accelerationConeRaycast.contactPointList.Count; i++)
+            GrapplingPoint _point = grapplingConeCollider.GetBestPoint();
+            Vector3 _direction = _point.transform.position - player.playerMesh.transform.position;
+            RaycastHit hit;
+            if (Physics.Raycast(player.playerMesh.transform.position, _direction, out hit, maxSwingingDistance))
             {
-                float _currentDistance = Vector3.Distance(accelerationConeRaycast.perfectPoint.position, accelerationConeRaycast.contactPointList[i]);
-                if (_currentDistance < _distance)
+                if (hit.transform.GetComponent<GrapplingPoint>() != null)
                 {
-                    _point = accelerationConeRaycast.contactPointList[i];
-                    _distance = _currentDistance;
+                    grapplePoint = _point;
+                    GPCtrl.Instance.grapplePointIndicator.ShowAtWorldPosition(hit.point);
                 }
             }
-            Vector3 _direction = _point - GPCtrl.Instance.player.playerMesh.transform.position;
-            RaycastHit hit;
-            if (Physics.Raycast(GPCtrl.Instance.player.playerMesh.transform.position, _direction, out hit, maxSwingingDistance))
-            {
-                GPCtrl.Instance.grapplePointIndicator.ShowAtWorldPosition(hit.point);
-                grapplePoint = hit.point;
-            }
-        } else if (!isGrappling)
-        {
-            grapplePoint = Vector3.zero;
-            GPCtrl.Instance.grapplePointIndicator.Hide();
         }
 
-        if (player.rightShoulder && player.leftShoulder && grapplePoint != Vector3.zero && !isGrappling)
+        if (player.rightShoulder && player.leftShoulder && grapplePoint != null && !isGrappling)
         {
             StartGrapple();
         }
@@ -109,6 +107,7 @@ public class PlayerGrappling : MonoBehaviour
     public void StartSwing()
     {
         if (springJoint) return;
+        if (player.rigibody.velocity.y > 0) return;
         if (swingConeRaycast.radius < swingConeRaycast.maxRadius)
             swingConeRaycast.radius += Time.deltaTime * radiusIncreaseSpeed;
         if (swingConeRaycast.contactPointList.Count > 0)
@@ -174,24 +173,31 @@ public class PlayerGrappling : MonoBehaviour
         rightGrapplingLineRenderer.positionCount = 2;
         rightGrapplingLineRenderer.SetPosition(0, player.rightHand.transform.position);
         rightGrapplingLineRenderer.SetPosition(1, player.rightHand.transform.position);
-
-        leftGrapplingLineRenderer.positionCount = 2;
-        leftGrapplingLineRenderer.SetPosition(0, player.leftHand.transform.position);
-        leftGrapplingLineRenderer.SetPosition(1, player.leftHand.transform.position);
         Invoke(nameof(ExecuteGrapple), grappleFreezeDelay);
     }
 
     public void ExecuteGrapple()
     {
+        leftGrapplingLineRenderer.positionCount = 2;
+        leftGrapplingLineRenderer.SetPosition(0, player.leftHand.transform.position);
+        leftGrapplingLineRenderer.SetPosition(1, player.leftHand.transform.position);
         grappleFreeze = false;
-        Vector3 _lowestPoint = new Vector3(transform.position.x, transform.position.y - 1f, transform.position.z);
 
-        float _grapplePointRelativeYPos = grapplePoint.y - _lowestPoint.y;
-        float _highestPointOnArc = _grapplePointRelativeYPos + overshootYAxis;
-
-        if (_grapplePointRelativeYPos < 0) _highestPointOnArc = overshootYAxis;
-
-        JumpToPosition(grapplePoint, _highestPointOnArc);
+        switch (grapplePoint.grapplingType)
+        {
+            case GrapplingPoint.GrapplingType.OnPoint:
+                Vector3 _lowestPoint = new Vector3(transform.position.x, transform.position.y - 1f, transform.position.z);
+                float _grapplePointRelativeYPos = grapplePoint.transform.position.y - _lowestPoint.y;
+                float _highestPointOnArc = _grapplePointRelativeYPos + overshootYAxis;
+                if (_grapplePointRelativeYPos < 0) _highestPointOnArc = overshootYAxis;
+                JumpToPosition(grapplePoint.transform.position, _highestPointOnArc);
+                break;
+            case GrapplingPoint.GrapplingType.Acceleration:
+                Vector3 _acceleration = (grapplePoint.transform.position - transform.position).normalized * grapplingAcceleration;
+                player.rigibody.AddForce(new Vector3(_acceleration.x, _acceleration.y, _acceleration.z), ForceMode.Impulse);
+                Invoke(nameof(StopGrapple), grappleFreezeDelay);
+                break;
+        }
         Debug.Log("EXECUTE GRAPPLE");
     }
 
@@ -200,7 +206,7 @@ public class PlayerGrappling : MonoBehaviour
         isGrappling = false;
         rightGrapplingLineRenderer.positionCount = 0;
         leftGrapplingLineRenderer.positionCount = 0;
-        grapplePoint = Vector3.zero;
+        grapplePoint = null;
         Debug.Log("STOP GRAPPLE");
     }
 
