@@ -1,0 +1,34 @@
+{
+    "name": "Camera",
+    "maps": [
+        {
+            "name": "Camera",
+            "id": "e64af775-54db-4a7b-9e73-df5c0d491402",
+            "actions": [
+                {
+                    "name": "XYLook",
+                    "type": "PassThrough",
+                    "id": "0ab8792c-8967-41c4-bae5-bdb7b6556bb3",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "14570a3b-fc99-42f5-8f4c-493e099b8d89",
+                    "path": "<Gamepad>/rightStick",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "XYLook",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        }
+    ],
+    "controlSchemes": []
+}
